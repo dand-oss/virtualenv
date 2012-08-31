@@ -1568,13 +1568,29 @@ def install_activate(home_dir, bin_dir, prompt=None):
             'activate.ps1': ACTIVATE_PS,
         }
 
-        # MSYS needs paths of the form /c/path/to/file
-        drive, tail = os.path.splitdrive(home_dir.replace(os.sep, '/'))
-        home_dir_msys = (drive and "/%s%s" or "%s%s") % (drive[:1], tail)
+        ostype = os.environ.get('OSTYPE')
+        if ostype == 'mks':
+            # MKS forward slash avoids backslash-escape quoting
+            home_dir_msys = home_dir.replace('\\', '/')
+        else:
+            # MSYS needs paths of the form /c/path/to/file
+            drive, tail = os.path.splitdrive(home_dir.replace(os.sep, '/'))
+            home_dir_msys = (drive and "/%s%s" or "%s%s") % (drive[:1], tail)
 
         # Run-time conditional enables (basic) Cygwin compatibility
         home_dir_sh = ("""$(if [ "$OSTYPE" "==" "cygwin" ]; then cygpath -u '%s'; else echo '%s'; fi;)""" %
                        (home_dir, home_dir_msys))
+
+        global ACTIVATE_SH
+        if ostype == 'mks':
+            # Set PATH correctly (use ; instead of :)
+            ACTIVATE_SH = \
+            ACTIVATE_SH.replace( '/__BIN_NAME__:$PATH', '/__BIN_NAME__;$PATH')
+
+            # Make 'deactivate' into a KSH function.
+            ACTIVATE_SH = \
+            ACTIVATE_SH.replace( '\ndeactivate () {', '\nfunction deactivate {')
+
         files['activate'] = ACTIVATE_SH.replace('__VIRTUAL_ENV__', home_dir_sh)
 
     else:
